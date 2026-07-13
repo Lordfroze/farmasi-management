@@ -37,9 +37,9 @@ function parseBody(req) {
     })
 }
 
-// End point
+// Function menampilkan data
 
-// Endpoint menampilkan seluruh data obat
+// Function menampilkan seluruh data obat
 async function getObat(req, res) {
     try {
         const [rows] = await db.query(`
@@ -61,14 +61,39 @@ async function getObat(req, res) {
     }
 }
 
+// Function menampilkan data obat berdasarkan id
+async function getObatById(req, res, id) {
+    try {
+        const [rows] = await db.query(`SELECT * FROM obat WHERE id= ?`, [id])
+
+        if (rows.length === 0) {
+            return sendJSON(res, 404, { status: 'error', message: 'Obat tidak ditemukan' })
+        }
+        sendJSON(res, 200, {
+            status: 'success',
+            data: rows[0]
+        })
+    } catch (error) {
+        console.error('Error get obat by id:', error)
+        sendJSON(res, 500, { status: 'error', message: 'Gagal mengambil data obat' })
+    }
+}
+
 // Membuat server
 const server = http.createServer(async (req, res) => {
     const parsedUrl = url.parse(req.url, true)
     const pathname = parsedUrl.pathname
     const method = req.method
 
+    // endpoint menampilkan seluruh data obat
     if (method === 'GET' && pathname === '/api/obat') {
         await getObat(req, res)
+    }
+
+    // endpoint menampilkan data obat berdasarkan id
+    if (method === 'GET' && pathname.match(/^\/api\/obat\/\d+$/)) {
+        const id = parseInt(pathname.split('/')[3]) // split id karena id berada di index 3 setelah /api/obat/
+        await getObatById(req, res, id)
     }
 })
 
