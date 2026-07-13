@@ -79,6 +79,52 @@ async function getObatById(req, res, id) {
     }
 }
 
+// Function menambahkan obat
+async function createObat(req, res) {
+    try {
+        const body = await parseBody(req)
+
+        const { nama_obat, kategori, harga, stock, tanggal_kadaluarsa } = body
+        if (!nama_obat || !kategori || !harga || !stock || !tanggal_kadaluarsa) {
+            return sendJSON(res, 400, {
+                status: 'error',
+                message: 'Harap isi semua field'
+            })
+        }
+
+        // validasi kolom kategori berdasarkan enum di database
+        const allowedKategori = ['antibiotik', 'analgesik', 'vitamin']
+        if (!allowedKategori.includes(kategori)) {
+            return sendJSON(res, 400, {
+                status: 'error',
+                message: 'Kategori tidak valid'
+            })
+        }
+
+        // insert data ke database
+        const [result] = await db.query(
+            `
+            INSERT INTO obat (nama_obat, kategori, harga, stock, tanggal_kadaluarsa)
+            VALUES (?, ?, ?, ?, ?)
+            `,
+            [nama_obat, kategori, harga, stock || 0, tanggal_kadaluarsa]
+        )
+
+        sendJSON(res, 201, {
+            status: 'success',
+            message: 'Obat berhasil ditambahkan',
+            id: result.insertId // mengambil id yang diinsert
+        })
+
+    } catch (error) {
+        console.error('Error create obat:', error)
+        sendJSON(res, 500, {
+            status: 'error',
+            message: 'Gagal menambahkan obat'
+        })
+    }
+}
+
 // Membuat server
 const server = http.createServer(async (req, res) => {
     const parsedUrl = url.parse(req.url, true)
@@ -94,6 +140,11 @@ const server = http.createServer(async (req, res) => {
     if (method === 'GET' && pathname.match(/^\/api\/obat\/\d+$/)) {
         const id = parseInt(pathname.split('/')[3]) // split id karena id berada di index 3 setelah /api/obat/
         await getObatById(req, res, id)
+    }
+
+    // endpoint menambahkan obat
+    if (method === 'POST' && pathname === '/api/obat') {
+        await createObat(req, res)
     }
 })
 
