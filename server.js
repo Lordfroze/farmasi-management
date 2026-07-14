@@ -297,6 +297,40 @@ async function jualObat(req, res) {
 
 }
 
+// Function menampilkan laporan
+async function getLaporan(req, res) {
+    try {
+        // mengambil data transaksi
+        const [rows] = await db.query(`
+            SELECT
+            t.id,
+            t.jumlah_terjual,
+            t.total_harga,
+            o.nama_obat,
+            o.kategori
+            FROM transaksi t
+            JOIN obat o ON t.obat_id = o.id
+            LIMIT 100
+            `)
+
+        // menghitung total pendapatan
+        const totalPendapatan = rows.reduce((sum, item) => sum + parseFloat(item.total_harga), 0)
+
+        sendJSON(res, 200, {
+            status: 'success',
+            total_transaksi: rows.length,
+            total_pendapatan: totalPendapatan,
+            data: rows,
+        })
+    } catch (error) {
+        console.error('Error get laporan:', error)
+        sendJSON(res, 500, {
+            status: 'error',
+            message: error.message || 'Gagal menampilkan laporan'
+        })
+    }
+}
+
 
 
 // Membuat server
@@ -336,6 +370,11 @@ const server = http.createServer(async (req, res) => {
     // endpoint untuk jual obat
     else if (method === 'POST' && pathname === '/api/transaksi/jual') {
         await jualObat(req, res)
+    }
+
+    // endpoint untuk menampilkan laporan
+    else if (method === 'GET' && pathname === '/api/transaksi/laporan') {
+        await getLaporan(req, res)
     }
 })
 
