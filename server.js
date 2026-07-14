@@ -125,6 +125,71 @@ async function createObat(req, res) {
     }
 }
 
+// function update obat
+async function updateObat(req, res, id) {
+    try {
+        const body = await parseBody(req) // mengambil body dari request
+        const { nama_obat, kategori, harga, stock, tanggal_kadaluarsa } = body // mengambil field dari body
+        const updates = []  // menyimpan update ke dalam array updates
+        const values = [] // menyimpan nilai dari field yang diupdate
+
+        if (nama_obat !== undefined) { // jika field nama_obat ada
+            updates.push('nama_obat = ?') // menambahkan nama_obat ke dalam updates
+            values.push(nama_obat) // push nilai nama_obat ke dalam values
+        }
+        if (kategori !== undefined) {
+            updates.push('kategori = ?')
+            values.push(kategori)
+        }
+        if (harga !== undefined) {
+            updates.push('harga = ?')
+            values.push(harga)
+        }
+        if (stock !== undefined) {
+            updates.push('stock = ?')
+            values.push(stock || 0)
+        }
+        if (tanggal_kadaluarsa !== undefined) {
+            updates.push('tanggal_kadaluarsa = ?')
+            values.push(tanggal_kadaluarsa)
+        }
+        // jika tidak ada field yang diupdate, maka return error
+        if (updates.length === 0) {
+            return sendJSON(res, 400, {
+                status: 'error',
+                message: 'Tidak ada field yang diupdate'
+            })
+        }
+
+        values.push(id) // push value diatas berdasarkan id
+
+        // update data ke database
+        const [result] = await db.query(
+            `UPDATE obat SET ${updates.join(', ')} WHERE id = ?`,
+            values
+        )
+
+        // jika tidak ada obat yang diupdate, maka return error
+        if (result.affectedRows === 0) {
+            return sendJSON(res, 404, {
+                status: 'error',
+                message: 'Obat tidak ditemukan'
+            })
+        }
+
+        sendJSON(res, 200, {
+            status: 'success',
+            message: 'Obat berhasil diupdate'
+        })
+    } catch (error) {
+        console.error('Error update obat:', error)
+        sendJSON(res, 500, {
+            status: 'error',
+            message: 'Gagal mengupdate obat'
+        })
+    }
+}
+
 // Membuat server
 const server = http.createServer(async (req, res) => {
     const parsedUrl = url.parse(req.url, true)
@@ -137,14 +202,20 @@ const server = http.createServer(async (req, res) => {
     }
 
     // endpoint menampilkan data obat berdasarkan id
-    if (method === 'GET' && pathname.match(/^\/api\/obat\/\d+$/)) {
+    else if (method === 'GET' && pathname.match(/^\/api\/obat\/\d+$/)) {
         const id = parseInt(pathname.split('/')[3]) // split id karena id berada di index 3 setelah /api/obat/
         await getObatById(req, res, id)
     }
 
     // endpoint menambahkan obat
-    if (method === 'POST' && pathname === '/api/obat') {
+    else if (method === 'POST' && pathname === '/api/obat') {
         await createObat(req, res)
+    }
+
+    // endpoint untuk update obat
+    else if (method === 'PUT' && pathname.match(/^\/api\/obat\/\d+$/)) {
+        const id = parseInt(pathname.split('/')[3]) // split id karena id berada di index 3 setelah /api/obat/
+        await updateObat(req, res, id)
     }
 })
 
