@@ -190,6 +190,32 @@ async function updateObat(req, res, id) {
     }
 }
 
+// Function menghapus obat
+async function deleteObat(req, res, id) {
+    try {
+        const [check] = await db.query(`SELECT id FROM obat WHERE id = ?`, [id])
+        if (check.length === 0) {
+            return sendJSON(res, 404, {
+                status: 'error',
+                message: 'Obat tidak ditemukan'
+            })
+        }
+
+        await db.query(`DELETE FROM obat WHERE id = ?`, [id])
+        sendJSON(res, 200, {
+            status: 'success',
+            message: 'Obat berhasil dihapus'
+        })
+    } catch (error) {
+        console.error('Error delete obat:', error)
+        sendJSON(res, 500, {
+            status: 'error',
+            message: 'Gagal menghapus obat'
+        })
+    }
+
+}
+
 // Membuat server
 const server = http.createServer(async (req, res) => {
     const parsedUrl = url.parse(req.url, true)
@@ -216,6 +242,12 @@ const server = http.createServer(async (req, res) => {
     else if (method === 'PUT' && pathname.match(/^\/api\/obat\/\d+$/)) {
         const id = parseInt(pathname.split('/')[3]) // split id karena id berada di index 3 setelah /api/obat/
         await updateObat(req, res, id)
+    }
+
+    // endpoint untuk menghapus obat
+    else if (method === 'DELETE' && pathname.match(/^\/api\/obat\/\d+$/)) {
+        const id = parseInt(pathname.split('/')[3]) // split id karena id berada di index 3 setelah /api/obat/
+        await deleteObat(req, res, id)
     }
 })
 
