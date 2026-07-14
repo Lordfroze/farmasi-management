@@ -216,6 +216,89 @@ async function deleteObat(req, res, id) {
 
 }
 
+// function jual obat
+async function jualObat(req, res) {
+    try {
+        const body = await parseBody(req) // mengambil body dari request
+        const { obat_id, jumlah } = body
+
+        if (!obat_id || !jumlah || jumlah < 0) {
+            return sendJSON(res, 400, {
+                status: 'error',
+                message: 'field obat_id dan jumlah harus diisi'
+            })
+        }
+
+        const connection = await db.getConnection()
+        await connection.beginTransaction()
+
+        try {
+            // mengambil data obat 
+            const [obat] = await connection.query(
+                `SELECT id, nama_obat, harga, stock FROM obat WHERE id = ? FOR UPDATE`,
+                [obat_id])
+
+            // jika tidak ada obat yang diupdate, maka return error
+            if (obat.length === 0) {
+                throw new Error('Obat tidak ditemukan')
+            }
+
+            // menyimpan data obat ke dalam variabel dataObat
+            const dataObat = obat[0]
+
+            // jika stock obat kurang dari jumlah jual, maka return error
+            if (dataObat.stock < jumlah) {
+                throw new Error(`stock tidak cukup, terisa : ${dataObat.stock}`)
+            }
+
+            // mengupdate stock obat
+            const stockBaru = dataObat.stock - jumlah
+
+            await connection.query(
+                `UPDATE obat SET stock = ? WHERE id = ?`, [stockBaru, obat_id]
+            )
+
+            // mengupdate TABEL transaksi
+            const totalHarga = dataObat.harga * jumlah
+
+            await connection.query(
+                `INSERT INTO transaksi (obat_id, jumlah_terjual, total_harga) VALUES (?, ?, ?)`,
+                [obat_id, jumlah, totalHarga]
+            )
+
+            // commit transaction jika semua query berhasil
+            await connection.commit()
+
+            sendJSON(res, 200, {
+                status: 'success',
+                message: 'Penjualan berhasil',
+                detail: {
+                    obat: dataObat.nama_obat,
+                    jumlah: jumlah,
+                    total_harga: totalHarga,
+                    stock_sisa: stockBaru
+                }
+            })
+        } catch (error) {
+            // jika ada error, maka rollback transaction
+            await connection.rollback()
+            throw error
+        } finally {
+            // selalu kembali ke pool connection
+            await connection.release()
+        }
+    } catch (error) {
+        console.error('Error jual obat:', error)
+        sendJSON(res, 500, {
+            status: 'error',
+            message: error.message || 'Gagal jual obat'
+        })
+    }
+
+}
+
+
+
 // Membuat server
 const server = http.createServer(async (req, res) => {
     const parsedUrl = url.parse(req.url, true)
@@ -248,6 +331,11 @@ const server = http.createServer(async (req, res) => {
     else if (method === 'DELETE' && pathname.match(/^\/api\/obat\/\d+$/)) {
         const id = parseInt(pathname.split('/')[3]) // split id karena id berada di index 3 setelah /api/obat/
         await deleteObat(req, res, id)
+    }
+
+    // endpoint untuk jual obat
+    else if (method === 'POST' && pathname === '/api/transaksi/jual') {
+        await jualObat(req, res)
     }
 })
 
